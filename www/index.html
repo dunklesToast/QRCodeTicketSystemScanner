@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="format-detection" content="telephone=no">
+    <meta name="msapplication-tap-highlight" content="no">
+    <meta name="viewport"
+          content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
+    <title>QRCode Reader APP</title>
+</head>
+<body>
+
+<div data-role="page" id="home" style="height: 100%">
+    <div data-role="header">
+        <h1 style="text-align: center">TICKET SCANNER</h1>
+    </div>
+    <div data-role="main" style="height: 100%; text-align: center" class="ui-content">
+        <h3 style="border: 2px" onclick="scan()">SCAN TICKETS</h3>
+        <h1>SETTINGS</h1>
+        <p>ServerHost (and Port)</p>
+        <input id="host">
+        <p>Prefix</p>
+        <input id="prefix">
+        <p>Device Name</p>
+        <input id="name">
+        <h3 style="border: 2px" onclick="connect()">CONNECT</h3>
+    </div>
+</div>
+
+<script src="./js/socket.io.slim.js"></script>
+<script type="text/javascript" src="cordova.js"></script>
+<script>
+    let ready = false;
+    document.addEventListener('deviceready', function () {
+        ready = true;
+    });
+    let prefix;
+    let socket;
+
+    function scan() {
+        if (ready) {
+            cordova.plugins.barcodeScanner.scan(
+                function (result) {
+                    if (!result.cancelled) {
+                        if (result.format === "QR_CODE") {
+                            let value = result.text;
+                            if (value.toString().startsWith(prefix)) {
+                                value = value.replace(prefix, '');
+                                socket.emit('scan', {
+                                    id: value
+                                });
+                            } else {
+                                alert('QR doesnt contains prefix\n'+value)
+                            }
+                        } else {
+                            alert('not a qr code')
+                        }
+                    } else {
+                        alert('scan cancelled')
+                    }
+                    scan();
+                },
+                function (error) {
+                    alert("Scanning failed: " + error);
+                }
+            );
+        }else {
+            alert('Application not fully loaded - wait about 5 seconds');
+        }
+    }
+
+    function connect() {
+        if (ready) {
+            socket = io.connect('http://' + document.getElementById('host').value);
+            socket.on('refused', (msg) => {
+                alert('CONNECTION REFUSED')
+            });
+            socket.emit('start', {
+                name: document.getElementById('name').value
+            });
+            prefix = document.getElementById('prefix').value;
+            socket.on('validTicket', (msg) => {
+                if(msg){
+                    alert('TICKET IS VALID\n'+msg);
+                }else {
+                    alert('TICKET IS INVALID')
+                }
+            })
+        } else {
+            alert('Application not fully loaded - wait about 5 seconds');
+        }
+
+    }
+</script>
+</body>
+</html>
